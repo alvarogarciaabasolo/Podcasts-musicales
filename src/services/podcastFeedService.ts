@@ -1,0 +1,48 @@
+import axios from 'axios';
+
+const CORS_PROXY = 'https://corsproxy.io/?';
+
+export const getPodcastFeed = async (feedUrl: string) => {
+  try {
+    const response = await axios.get(`${CORS_PROXY}${feedUrl}`);
+    const data = await response.data;
+    const episodes = parseXMLToEpisodes(data);
+    
+    return episodes;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 403) {
+        console.error('Error: Acceso prohibido. No tienes permiso para acceder al recurso.');
+        throw new Error('Acceso prohibido. Inténtalo de nuevo más tarde o verifica tus permisos.');
+      } else if (error.response?.status === 429) {
+        console.error('Error: Has alcanzado el límite de solicitudes para CORS Anywhere.');
+        throw new Error('Has alcanzado el límite de solicitudes. Inténtalo de nuevo más tarde.');
+      } else {
+        console.error('Error fetching podcast feed:', error.message);
+        throw error;
+      }
+    } else {
+      console.error('Unknown error:', error);
+      throw new Error('Se produjo un error desconocido.');
+    }
+  }
+};
+
+const parseXMLToEpisodes = (xmlData: string) => {
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xmlData, 'text/xml');
+
+  const items = xmlDoc.getElementsByTagName('item');
+  const episodes = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+
+    const enclosure = item.getElementsByTagName('enclosure')[0];
+    if (enclosure) {
+      const audioUrl = enclosure.getAttribute('url');
+      episodes.push(audioUrl);
+    }
+  }
+  return episodes;
+};
